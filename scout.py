@@ -1,36 +1,64 @@
 import sys
 import googlemaps
-from google.cloud import firestore
+import requests
+import warnings
+
+# Ignora os avisos de segurança quando o site do cliente não tem SSL
+warnings.filterwarnings('ignore', message='Unverified HTTPS request')
+
+try:
+    from db_connect import db
+except ImportError:
+    from google.cloud import firestore
+    db = firestore.Client.from_service_account_json("credenciais-google.json")
 
 API_KEY = "AIzaSyCNnQKReERp-bYqVg2cT9f9wOqGSGiDR2A"
 gmaps = googlemaps.Client(key=API_KEY)
-from db_connect import db
+
+def verificar_site(url):
+    if not url or url == 'Não possui':
+        return "Não possui site"
+    try:
+        # Tenta acessar o site ignorando erros de certificado para ver se ele pelo menos carrega
+        resposta = requests.get(url, timeout=5, verify=False)
+        if url.startswith("https"):
+            return "Seguro (HTTPS Ativo)"
+        else:
+            return "Inseguro (Sem HTTPS - Risco de Segurança)"
+    except requests.exceptions.SSLError:
+        return "Inseguro (Erro de Certificado SSL quebrado)"
+    except requests.exceptions.RequestException:
+        return "Site fora do ar ou link quebrado"
 
 def filtrar_e_salvar_negocio(place_details, nicho_pesquisado):
     nome = place_details.get('name')
     rating = place_details.get('rating', 0)
     user_ratings_total = place_details.get('user_ratings_total', 0)
     place_id = place_details.get('place_id')
+    website = place_details.get('website', 'Não possui')
     
     doc_ref = db.collection("leads").document(place_id)
     if doc_ref.get().exists:
         print(f"⏭️ {nome} já existe. Pula para o próximo.")
         return
 
-    # 🚀 FILTRO REMOVIDO: A DeLimaTec agora pega TODOS os comércios!
+    # Nova função de T.I: Raio-X do Site
+    status_do_site = verificar_site(website)
+
     dados_lead = {
         "id_google": place_id,
         "nome": nome,
-        "nicho": nicho_pesquisado, 
+        "nicho": nicho_pesquisado,
         "telefone": place_details.get('formatted_phone_number', 'Não encontrado'),
         "endereco": place_details.get('formatted_address', ''),
         "nota_atual": rating,
         "total_avaliacoes": user_ratings_total,
-        "website": place_details.get('website', 'Não possui'),
+        "website": website,
+        "status_site": status_do_site, # NOVO: Salva a saúde da T.I do cliente
         "status_agencia": "scouted"
     }
     doc_ref.set(dados_lead)
-    print(f"✅ [Firestore] Lead salvo: {nome} (Nota: {rating})")
+    print(f"✅ [Firestore] Lead salvo: {nome} | T.I: {status_do_site}")
 
 def varrer_regiao(termo_busca, localizacao):
     print(f"🔎 Buscando '{termo_busca}' em '{localizacao}'...")
