@@ -23,10 +23,43 @@ except ImportError:
     from google.cloud import firestore
     db = firestore.Client.from_service_account_json("credenciais-google.json")
 
-# Inicializa a memória da página atual no sistema (Começa na página 0)
+# =========================================================================
+# CONFIGURAÇÃO DA PÁGINA E SISTEMA DE LOGIN (NOVIDADE)
+# =========================================================================
+st.set_page_config(page_title="DeLimaTec OS", page_icon="💻", layout="wide")
+
+# Inicializa as variáveis de sessão
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
 if "pagina_vendas" not in st.session_state:
     st.session_state.pagina_vendas = 0
 
+def verificar_login():
+    # Puxa os dados do cofre (ou usa um padrão caso rode na máquina local)
+    usu_correto = st.secrets.get("LOGIN_USUARIO", "admin")
+    senha_correta = st.secrets.get("LOGIN_SENHA", "admin")
+    
+    if st.session_state.usu_input == usu_correto and st.session_state.senha_input == senha_correta:
+        st.session_state.autenticado = True
+        st.session_state.senha_input = "" # Limpa a senha por segurança
+    else:
+        st.error("❌ Usuário ou senha incorretos.")
+
+# Bloqueio de Tela
+if not st.session_state.autenticado:
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.title("🔒 Acesso Restrito")
+        st.markdown("Por favor, identifique-se para acessar o **DeLimaTec OS**.")
+        with st.container(border=True):
+            st.text_input("Usuário", key="usu_input")
+            st.text_input("Senha", type="password", key="senha_input")
+            st.button("Entrar no Sistema", on_click=verificar_login, type="primary", use_container_width=True)
+    st.stop() # Esta função MATA o carregamento da página se não estiver logado. Ninguém passa daqui!
+
+# =========================================================================
+# FUNÇÕES DE APOIO E PDF
+# =========================================================================
 def otimizar_imagem_base64(b64_string):
     try:
         img_bytes = base64.b64decode(b64_string)
@@ -113,8 +146,14 @@ def gerar_pdf_proposta(lead):
     pdf.multi_cell(0, 6, "Para alinhar valores de investimento, responda esta mensagem no WhatsApp e agendaremos uma rápida reunião de alinhamento técnico.")
     return bytes(pdf.output())
 
-st.set_page_config(page_title="DeLimaTec OS", page_icon="💻", layout="wide")
+
+# =========================================================================
+# PAINEL PRINCIPAL (SÓ APARECE DEPOIS DE LOGAR)
+# =========================================================================
 st.title("💻 DeLimaTec OS - Máquina de Vendas e CRM")
+if st.button("Sair (Logout)", type="secondary"):
+    st.session_state.autenticado = False
+    st.rerun()
 
 aba_buscar, aba_vendas, aba_crm, aba_metricas = st.tabs(["🔎 Mineração", "💰 Fila de Vendas", "💼 Pipeline CRM", "📊 Métricas"])
 
@@ -153,7 +192,7 @@ with aba_buscar:
             finally:
                 sys.stdout = antigo_stdout
 
-# ==================== ABA 2: FILA DE VENDAS PAGINADA ====================
+# ==================== ABA 2 ====================
 with aba_vendas:
     try:
         leads_prontos = list(db.collection("leads").where("status_agencia", "==", "ready_to_send").stream())
@@ -163,11 +202,8 @@ with aba_vendas:
         else:
             total_leads = len(leads_prontos)
             itens_por_pagina = 5
-            
-            # Cálculo matemático simples de páginas totais
             total_paginas = (total_leads + itens_por_pagina - 1) // itens_por_pagina
             
-            # Segurança: Evita que o índice quebre caso leads sumam da lista
             if st.session_state.pagina_vendas >= total_paginas:
                 st.session_state.pagina_vendas = max(0, total_paginas - 1)
                 
@@ -176,7 +212,6 @@ with aba_vendas:
             fim = inicio + itens_por_pagina
             leads_para_exibir = leads_prontos[inicio:fim]
             
-            # Mostra o status da paginação no topo
             st.write(f"Há **{total_leads}** oportunidades na fila. Exibindo página **{pagina_atual + 1}** de **{total_paginas}**.")
             
             for doc in leads_para_exibir:
@@ -219,10 +254,9 @@ with aba_vendas:
                                 st.text_area("Resposta Humanizada 1:", amostras.get('resposta_1', ''), height=100, key=f"resp1_{doc.id}")
                                 st.text_area("Resposta Humanizada 2:", amostras.get('resposta_2', ''), height=100, key=f"resp2_{doc.id}")
                                 
-                        st.markdown("### 🖼️ Criativo Visual para o Post")
                         imagem_b64 = lead.get('imagem_generated_base64') if lead.get('imagem_generated_base64') else lead.get('imagem_gerada_base64')
-                        
                         if imagem_b64:
+                            st.markdown("### 🖼️ Criativo Visual para o Post")
                             imagem_bytes = base64.b64decode(imagem_b64)
                             st.image(imagem_bytes, caption="Criativo gerado com sucesso!", use_container_width=True)
                             st.download_button(label="💾 Baixar Imagem", data=imagem_bytes, file_name=f"post_{doc.id}.jpg", mime="image/jpeg", key=f"dl_{doc.id}")
@@ -262,7 +296,6 @@ with aba_vendas:
                                     except Exception as e:
                                         st.error(f"Erro ao gerar imagem: {e}")
 
-            # 🚀 NOVO BLOCO: Botões de navegação de página
             st.markdown("---")
             col_anterior, col_centro, col_proxima = st.columns([1, 2, 1])
             with col_anterior:
