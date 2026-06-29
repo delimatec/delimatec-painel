@@ -31,7 +31,7 @@ def criar_mensagem_vendas(dados_lead):
     """
 
     message = anthropic_client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-haiku-4-5-20251001",
         max_tokens=500,
         temperature=0.6,
         messages=[{"role": "user", "content": prompt}]
