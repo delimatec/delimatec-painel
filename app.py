@@ -8,7 +8,7 @@ import requests
 import urllib.parse
 from PIL import Image
 import io
-import sys # NOVO: Biblioteca para capturar o terminal
+import sys
 from fpdf import FPDF
 
 # Importa as funções lógicas dos agentes
@@ -22,6 +22,10 @@ try:
 except ImportError:
     from google.cloud import firestore
     db = firestore.Client.from_service_account_json("credenciais-google.json")
+
+# Inicializa a memória da página atual no sistema (Começa na página 0)
+if "pagina_vendas" not in st.session_state:
+    st.session_state.pagina_vendas = 0
 
 def otimizar_imagem_base64(b64_string):
     try:
@@ -38,7 +42,7 @@ def otimizar_imagem_base64(b64_string):
 def limpar_texto_pdf(texto):
     if not isinstance(texto, str): return ""
     substituicoes = {"—": "-", "–": "-", "“": '"', "”": '"', "‘": "'", "’": "'", "…": "...", "⭐": "*", "✨": "*", "🚀": ">", "🎁": ">"}
-    for velho, novo in substituicoes.items(): texto = texto.replace(velho, novo)
+    for velho, retro in substituicoes.items(): texto = texto.replace(velho, retro)
     return texto.encode('latin-1', 'replace').decode('latin-1')
 
 def gerar_pdf_auditoria(lead, amostras):
@@ -123,22 +127,17 @@ with aba_buscar:
     if st.button("🚀 Iniciar Automação", type="primary"):
         if nicho and localizacao:
             st.markdown("### 💻 Terminal de Execução")
-            # Cria o container visual onde os textos vão aparecer
             terminal_container = st.empty()
             
-            # Classe que intercepta os textos do terminal
             class RedirecionadorTerminal:
                 def __init__(self, container):
                     self.container = container
                     self.texto = ""
                 def write(self, msg):
                     self.texto += msg
-                    # Escreve o texto com formato de código (fundo cinza escuro/preto)
                     self.container.code(self.texto, language="bash")
-                def flush(self):
-                    pass
+                def flush(self): pass
 
-            # Ativa o redirecionamento
             antigo_stdout = sys.stdout
             sys.stdout = RedirecionadorTerminal(terminal_container)
             
@@ -152,18 +151,35 @@ with aba_buscar:
             except Exception as e:
                 st.error(f"Erro no pipeline: {e}")
             finally:
-                # Sempre devolve o controle do terminal para o sistema para não quebrar a nuvem
                 sys.stdout = antigo_stdout
 
-# ==================== ABA 2 ====================
+# ==================== ABA 2: FILA DE VENDAS PAGINADA ====================
 with aba_vendas:
     try:
         leads_prontos = list(db.collection("leads").where("status_agencia", "==", "ready_to_send").stream())
         if not leads_prontos:
             st.info("📭 Fila de envios vazia.")
+            st.session_state.pagina_vendas = 0
         else:
-            st.write(f"Há **{len(leads_prontos)}** oportunidades prontas na fila. Mostrando 5 por vez.")
-            for doc in leads_prontos[:5]:
+            total_leads = len(leads_prontos)
+            itens_por_pagina = 5
+            
+            # Cálculo matemático simples de páginas totais
+            total_paginas = (total_leads + itens_por_pagina - 1) // itens_por_pagina
+            
+            # Segurança: Evita que o índice quebre caso leads sumam da lista
+            if st.session_state.pagina_vendas >= total_paginas:
+                st.session_state.pagina_vendas = max(0, total_paginas - 1)
+                
+            pagina_atual = st.session_state.pagina_vendas
+            inicio = pagina_atual * itens_por_pagina
+            fim = inicio + itens_por_pagina
+            leads_para_exibir = leads_prontos[inicio:fim]
+            
+            # Mostra o status da paginação no topo
+            st.write(f"Há **{total_leads}** oportunidades na fila. Exibindo página **{pagina_atual + 1}** de **{total_paginas}**.")
+            
+            for doc in leads_para_exibir:
                 lead = doc.to_dict()
                 with st.container(border=True):
                     col_info, col_pitch = st.columns([1, 2])
@@ -245,6 +261,23 @@ with aba_vendas:
                                             st.rerun()
                                     except Exception as e:
                                         st.error(f"Erro ao gerar imagem: {e}")
+
+            # 🚀 NOVO BLOCO: Botões de navegação de página
+            st.markdown("---")
+            col_anterior, col_centro, col_proxima = st.columns([1, 2, 1])
+            with col_anterior:
+                if pagina_atual > 0:
+                    if st.button("⬅️ Página Anterior"):
+                        st.session_state.pagina_vendas -= 1
+                        st.rerun()
+            with col_centro:
+                st.markdown(f"<p style='text-align: center; font-weight: bold;'>Página {pagina_atual + 1} de {total_paginas}</p>", unsafe_allow_html=True)
+            with col_proxima:
+                if pagina_atual < total_paginas - 1:
+                    if st.button("Próxima Página ➡️"):
+                        st.session_state.pagina_vendas += 1
+                        st.rerun()
+                        
     except Exception as e:
         st.error(f"Erro ao carregar os leads: {e}")
 
@@ -258,14 +291,10 @@ with aba_crm:
         
         leads_crm = list(db.collection("leads").where("status_agencia", "in", ["sent", "negotiating", "meeting", "closed"]).stream())
         
-        with col_enviado:
-            st.markdown("### 📨 Enviado")
-        with col_negociando:
-            st.markdown("### 💬 Em Negociação")
-        with col_reuniao:
-            st.markdown("### 📅 Reunião")
-        with col_fechado:
-            st.markdown("### 💰 Fechado")
+        with col_enviado: st.markdown("### 📨 Enviado")
+        with col_negociando: st.markdown("### 💬 Em Negociação")
+        with col_reuniao: st.markdown("### 📅 Reunião")
+        with col_fechado: st.markdown("### 💰 Fechado")
             
         for doc in leads_crm:
             lead = doc.to_dict()
