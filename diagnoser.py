@@ -38,7 +38,7 @@ def analisar_com_claude(dados_empresa, avaliacoes):
     prompt = f"Você é o consultor chefe da DeLimaTec (Especialistas em Suporte de TI e SEO Local). Analise este comércio e crie um diagnóstico direto (gargalo de infraestrutura digital e marketing) em até 100 palavras. Mostre que é um erro técnico solucionável. Empresa: {dados_empresa['nome']}. Nota: {dados_empresa['nota_atual']}. Status do Site de Vendas (T.I.): {dados_empresa.get('status_site', 'Desconhecido')}. Avaliações ruins do Maps: {contexto_reviews}"
 
     message = anthropic_client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=250, temperature=0.3,
+        model="claude-haiku-4-5-20251001", max_tokens=400, temperature=0.3,
         messages=[{"role": "user", "content": prompt}]
     )
     return message.content[0].text
