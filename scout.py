@@ -2,9 +2,14 @@ import sys
 import googlemaps
 import requests
 import warnings
+import os
 
-# Ignora os avisos de segurança quando o site do cliente não tem SSL
-warnings.filterwarnings('ignore', message='Unverified HTTPS request')
+try:
+    import streamlit as st
+    API_KEY = st.secrets["GOOGLE_API_KEY"]
+except Exception:
+    # Se rodar local na sua máquina, ele tenta achar na variável de ambiente
+    API_KEY = os.environ.get("GOOGLE_API_KEY", "COLE_SUA_CHAVE_AQUI_SO_NA_SUA_MAQUINA")
 
 try:
     from db_connect import db
@@ -12,7 +17,9 @@ except ImportError:
     from google.cloud import firestore
     db = firestore.Client.from_service_account_json("credenciais-google.json")
 
-API_KEY = "AIzaSyCNnQKReERp-bYqVg2cT9f9wOqGSGiDR2A"
+# Ignora os avisos de segurança quando o site do cliente não tem SSL
+warnings.filterwarnings('ignore', message='Unverified HTTPS request')
+
 gmaps = googlemaps.Client(key=API_KEY)
 
 def verificar_site(url):
