@@ -1,6 +1,5 @@
 import os
 import json
-import googlemaps
 from anthropic import Anthropic
 
 try:
@@ -9,52 +8,70 @@ except ImportError:
     from google.cloud import firestore
     db = firestore.Client.from_service_account_json("credenciais-google.json")
 
-GOOGLE_API_KEY = "AIzaSyCNnQKReERp-bYqVg2cT9f9wOqGSGiDR2A"
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "SUA_CHAVE_CLAUDE_AQUI")
-
-gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if "SUA_CHAVE" not in ANTHROPIC_API_KEY else None
 
-def obter_avaliacoes_ruins(place_id):
-    try:
-        detalhes = gmaps.place(place_id=place_id, fields=['reviews'], language='pt-BR')
-        reviews = detalhes.get('result', {}).get('reviews', [])
-        avaliacoes_criticas = []
-        for r in reviews:
-            if r.get('rating', 5) <= 3:
-                avaliacoes_criticas.append({
-                    "autor": r.get('author_name'), "nota": r.get('rating'),
-                    "texto": r.get('text'), "tempo": r.get('relative_time_description')
-                })
-        return avaliacoes_criticas[:3]
-    except:
-        return []
-
-def analisar_com_claude(dados_empresa, avaliacoes):
-    if not anthropic_client: return "Perfil precisa de posicionamento local e suporte digital."
-    contexto_reviews = "\n".join([f"- Nota {r['nota']}: {r['texto']}" for r in avaliacoes]) if avaliacoes else "Pouca tração orgânica na busca."
+def criar_mensagem_vendas(dados_lead):
+    amostras = dados_lead.get('amostras_geradas', {})
     
-    # NOVO: Inserimos o Status do Site no prompt!
-    prompt = f"Você é o consultor chefe da DeLimaTec (Especialistas em Suporte de TI e SEO Local). Analise este comércio e crie um diagnóstico direto (gargalo de infraestrutura digital e marketing) em até 100 palavras. Mostre que é um erro técnico solucionável. Empresa: {dados_empresa['nome']}. Nota: {dados_empresa['nota_atual']}. Status do Site de Vendas (T.I.): {dados_empresa.get('status_site', 'Desconhecido')}. Avaliações ruins do Maps: {contexto_reviews}"
+    prompt = f"""
+    Escreva uma mensagem de abordagem comercial para o WhatsApp do dono da empresa {dados_lead['nome']}.
+    Use as seguintes informações coletadas pelo nosso sistema:
+    - Diagnóstico do problema online e de T.I: {dados_lead['diagnostico_ia']}
+    - Presente: Post ("{amostras.get('post_proposto', '')[:80]}...") e Respostas Otimizadas.
+
+    Instruções estritas de tom e posicionamento (DeLimaTec):
+    - Você representa a DeLimaTec, uma empresa completa de Soluções em T.I., Infraestrutura e Posicionamento Digital.
+    - Comece amigável e direto: 'Olá, responsável pela {dados_lead['nome']}, tudo bem? Aqui é da equipe da DeLimaTec.'
+    - Mostre autoridade: explique que a DeLimaTec ajuda empresas não só a ter computadores e redes seguras, mas também a dominar as buscas locais usando tecnologia.
+    - Apresente o diagnóstico do Maps/Site de forma polida.
+    - Entregue a isca: 'Para mostrar a qualidade do nosso trabalho, nossa IA gerou um material de presente para o perfil de vocês usar hoje.'
+    - Termine com a CTA: 'Podemos falar 5 minutos amanhã?'
+    - Mantenha curto e cirúrgico.
+    """
 
     message = anthropic_client.messages.create(
-        model="claude-haiku-4-5-20251001", max_tokens=250, temperature=0.3,
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=500,
+        temperature=0.6,
         messages=[{"role": "user", "content": prompt}]
     )
     return message.content[0].text
 
-def rodar_diagnostico():
-    docs = db.collection("leads").where("status_agencia", "==", "scouted").stream()
+# NOVO: Função para gerar o Follow-up
+def gerar_follow_up_com_claude(dados_lead):
+    if not anthropic_client: return "Olá! Passando para saber se conseguiu avaliar o diagnóstico que enviei. Podemos conversar? Abs, equipe DeLimaTec."
+    
+    prompt = f"""
+    Você é consultor da DeLimaTec. Crie uma mensagem curta de WhatsApp (Follow-up) para a empresa {dados_lead['nome']}.
+    Há 48 horas enviamos esta mensagem inicial: "{dados_lead.get('pitch_vendas_whatsapp')}"
+    
+    Objetivo: Perguntar educadamente se o responsável conseguiu ver o diagnóstico de T.I./Maps e o presente, e se tem 5 minutos para conversarmos.
+    Regras: Seja muito curto, natural, amigável. Não seja insistente. Assine como equipe DeLimaTec.
+    """
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=250,
+            temperature=0.7,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return message.content[0].text
+    except Exception as e:
+        return "Olá! Passando para saber se conseguiu dar uma olhada na auditoria de tecnologia que mandei outro dia. Podemos falar rapidinho? Abs, equipe DeLimaTec."
+
+
+def rodar_pitcher():
+    docs = db.collection("leads").where("status_agencia", "==", "content_built").stream()
     for doc in docs:
         dados_lead = doc.to_dict()
-        print(f"🔍 Diagnosticando Infra e Maps (DeLimaTec): {dados_lead['nome']}...")
-        piores = obter_avaliacoes_ruins(dados_lead['id_google'])
-        diag = analisar_com_claude(dados_lead, piores)
-        doc.reference.update({
-            "piores_avaliacoes": piores,
-            "diagnostico_ia": diag,
-            "status_agencia": "diagnosed"
-        })
+        print(f"📣 Criando mensagem comercial DeLimaTec: {dados_lead['nome']}...")
+        pitch = criar_mensagem_vendas(dados_lead)
+        if pitch:
+            doc.reference.update({
+                "pitch_vendas_whatsapp": pitch,
+                "status_agencia": "ready_to_send"
+            })
 
 if __name__ == "__main__":
-    rodar_diagnostico()
+    rodar_pitcher()
