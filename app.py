@@ -8,6 +8,7 @@ import requests
 import urllib.parse
 from PIL import Image
 import io
+import sys # NOVO: Biblioteca para capturar o terminal
 from fpdf import FPDF
 
 # Importa as funções lógicas dos agentes
@@ -116,19 +117,43 @@ aba_buscar, aba_vendas, aba_crm, aba_metricas = st.tabs(["🔎 Mineração", "�
 # ==================== ABA 1 ====================
 with aba_buscar:
     col1, col2 = st.columns(2)
-    with col1: nicho = st.text_input("Nicho?", placeholder="Ex: Escritório Contabilidade")
-    with col2: localizacao = st.text_input("Local?", placeholder="Ex: Pinheiros, São Paulo")
+    with col1: nicho = st.text_input("Nicho?", placeholder="Ex: Padaria")
+    with col2: localizacao = st.text_input("Local?", placeholder="Ex: Vila Izabel, Guarulhos SP")
+    
     if st.button("🚀 Iniciar Automação", type="primary"):
         if nicho and localizacao:
-            with st.spinner("🤖 Analisando T.I. e Buscas..."):
-                try:
+            st.markdown("### 💻 Terminal de Execução")
+            # Cria o container visual onde os textos vão aparecer
+            terminal_container = st.empty()
+            
+            # Classe que intercepta os textos do terminal
+            class RedirecionadorTerminal:
+                def __init__(self, container):
+                    self.container = container
+                    self.texto = ""
+                def write(self, msg):
+                    self.texto += msg
+                    # Escreve o texto com formato de código (fundo cinza escuro/preto)
+                    self.container.code(self.texto, language="bash")
+                def flush(self):
+                    pass
+
+            # Ativa o redirecionamento
+            antigo_stdout = sys.stdout
+            sys.stdout = RedirecionadorTerminal(terminal_container)
+            
+            try:
+                with st.spinner("🤖 Inicializando varredura e IA..."):
                     varrer_regiao(nicho, localizacao)
                     rodar_diagnostico()
                     rodar_builder()
                     rodar_pitcher()
-                    st.success("✨ Concluído!")
-                except Exception as e:
-                    st.error(f"Erro no pipeline: {e}")
+                    st.success("✨ Automação Concluída! Mude para a aba 'Fila de Vendas'.")
+            except Exception as e:
+                st.error(f"Erro no pipeline: {e}")
+            finally:
+                # Sempre devolve o controle do terminal para o sistema para não quebrar a nuvem
+                sys.stdout = antigo_stdout
 
 # ==================== ABA 2 ====================
 with aba_vendas:
