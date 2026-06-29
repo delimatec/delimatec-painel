@@ -4,12 +4,17 @@ import googlemaps
 from anthropic import Anthropic
 
 try:
+    import streamlit as st
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+except Exception:
+    GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "COLE_SUA_CHAVE_AQUI_SO_NA_SUA_MAQUINA")
+
+try:
     from db_connect import db
 except ImportError:
     from google.cloud import firestore
     db = firestore.Client.from_service_account_json("credenciais-google.json")
 
-GOOGLE_API_KEY = "AIzaSyCNnQKReERp-bYqVg2cT9f9wOqGSGiDR2A"
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "SUA_CHAVE_CLAUDE_AQUI")
 
 gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
