@@ -130,7 +130,7 @@ def gerar_pdf_proposta(lead):
     pdf.set_font("Arial", 'B', 11)
     pdf.cell(0, 8, "Pacote 2: Suporte T.I. Básico - R$ 297,00 / mês", ln=True)
     pdf.set_font("Arial", '', 10)
-    pdf.multi_cell(0, 6, "- Suporte Remoto (até 3 computadores)\n- Manutenção preventiva básica\n- SLA de resposta de 6 horas")
+    pdf.multi_cell(0, 6, "- Suporte Remoto (até 3 computadores)\n- Manutenção preventiva básica\n- SLA de resposta de 6 hours")
     pdf.ln(5)
 
     pdf.set_font("Arial", 'B', 11)
@@ -259,11 +259,10 @@ with aba_vendas:
                         link_ig = f"https://www.google.com/search?q=site:instagram.com+{nome_formatado}+{endereco_formatado}"
                         st.link_button("🟣 Espiar Instagram", link_ig)
                         
-                        # NOVO: Telefone Editável e Disparo Turbo
+                        # Telefone Editável e Disparo Turbo
                         telefone_db = lead.get('telefone', '')
                         novo_telefone = st.text_input("📞 WhatsApp do Cliente:", value=telefone_db, key=f"tel_input_{doc.id}")
                         
-                        # Salva o novo telefone no banco se a esposa editar
                         if novo_telefone != telefone_db:
                             doc.reference.update({"telefone": novo_telefone})
                         
@@ -277,8 +276,14 @@ with aba_vendas:
                             
                             st.link_button("🚀 Disparo Turbo (WhatsApp)", link_wpp, type="primary")
                         
-                        if st.button("✅ Marcar Enviado (Mover pro CRM)", key=f"status_{doc.id}"):
+                        st.markdown("---")
+                        if st.button("✅ Marcar Enviado (Mover pro CRM)", key=f"status_{doc.id}", use_container_width=True):
                             doc.reference.update({"status_agencia": "sent"})
+                            st.rerun()
+                        
+                        # 🔴 NOVO BOTÃO: DISPENSAR COMÉRCIO GRANDE
+                        if st.button("❌ Dispensar Comércio", key=f"dispensar_{doc.id}", type="secondary", use_container_width=True):
+                            doc.reference.update({"status_agencia": "dismissed"})
                             st.rerun()
                             
                     with col_pitch:
@@ -392,7 +397,6 @@ with aba_crm:
                         if fup_texto:
                             st.text_area("Texto de Follow-up:", fup_texto, height=100, key=f"txt_{doc.id}")
                             
-                            # NOVO: Disparo Turbo também no Follow-up do CRM!
                             tel_fup_limpo = "".join([c for c in tel if c.isdigit()])
                             if tel_fup_limpo:
                                 if not tel_fup_limpo.startswith("55") and len(tel_fup_limpo) >= 10: 
