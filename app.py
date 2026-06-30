@@ -250,7 +250,6 @@ with aba_vendas:
                 with st.container(border=True):
                     col_info, col_pitch = st.columns([1, 2])
                     with col_info:
-                        # GERA O LINK DO GOOGLE MAPS
                         nome_lead = lead.get('nome', 'Sem Nome')
                         id_google = lead.get('id_google', '')
                         nome_url = urllib.parse.quote(nome_lead)
@@ -259,7 +258,6 @@ with aba_vendas:
                         else:
                             maps_link = f"https://www.google.com/maps/search/?api=1&query={nome_url}"
                         
-                        # TÍTULO AGORA É CLICÁVEL
                         st.markdown(f"### [📍 {nome_lead}]({maps_link})")
                         
                         st.write(f"🔐 **T.I Site:** {lead.get('status_site', 'Não checado')}")
@@ -269,7 +267,6 @@ with aba_vendas:
                         link_ig = f"https://www.google.com/search?q=site:instagram.com+{nome_url}+{endereco_formatado}"
                         st.link_button("🟣 Espiar Instagram", link_ig)
                         
-                        # Telefone Editável e Disparo Turbo
                         telefone_db = lead.get('telefone', '')
                         novo_telefone = st.text_input("📞 WhatsApp do Cliente:", value=telefone_db, key=f"tel_input_{doc.id}")
                         
@@ -280,8 +277,11 @@ with aba_vendas:
                         if tel_limpo:
                             if not tel_limpo.startswith("55") and len(tel_limpo) >= 10: tel_limpo = "55" + tel_limpo
                             
+                            # AQUI ESTÁ A MÁGICA: Limpando a formatação pesada para o WhatsApp
                             pitch_texto = lead.get('pitch_vendas_whatsapp', '')
-                            texto_codificado = urllib.parse.quote(pitch_texto)
+                            pitch_texto_limpo = pitch_texto.replace('**', '*').replace('---', '')
+                            
+                            texto_codificado = urllib.parse.quote(pitch_texto_limpo)
                             link_wpp = f"https://wa.me/{tel_limpo}?text={texto_codificado}"
                             
                             st.link_button("🚀 Disparo Turbo (WhatsApp)", link_wpp, type="primary")
@@ -302,7 +302,9 @@ with aba_vendas:
                             c1.download_button("📄 Baixar Auditoria", gerar_pdf_auditoria(lead, amostras), f"Auditoria_{lead.get('nome')}.pdf", "application/pdf", key=f"aud_{doc.id}")
                             c2.download_button("💼 Baixar Proposta Comercial", gerar_pdf_proposta(lead), f"Proposta_{lead.get('nome')}.pdf", "application/pdf", key=f"prop_{doc.id}")
                             
-                        st.text_area("Pitch WhatsApp (Pode ser ajustado aqui ou no próprio app):", lead.get('pitch_vendas_whatsapp', ''), height=150, key=f"pitch_{doc.id}")
+                        # Mostrando o texto já limpo na tela do painel também
+                        pitch_display = lead.get('pitch_vendas_whatsapp', '').replace('**', '*').replace('---', '')
+                        st.text_area("Pitch WhatsApp:", pitch_display, height=150, key=f"pitch_{doc.id}")
                         
                         if amostras:
                             with st.expander("📝 Ver Post e Respostas"):
@@ -396,7 +398,6 @@ with aba_crm:
             
             with target_col:
                 with st.container(border=True):
-                    # Título também clicável no Kanban
                     nome_lead_crm = lead.get('nome', 'Sem Nome')
                     id_google_crm = lead.get('id_google', '')
                     if id_google_crm:
@@ -413,13 +414,14 @@ with aba_crm:
                     if status in ["sent", "negotiating"]:
                         fup_texto = lead.get("follow_up_texto")
                         if fup_texto:
-                            st.text_area("Texto de Follow-up:", fup_texto, height=100, key=f"txt_{doc.id}")
+                            fup_texto_limpo = fup_texto.replace('**', '*').replace('---', '')
+                            st.text_area("Texto de Follow-up:", fup_texto_limpo, height=100, key=f"txt_{doc.id}")
                             
                             tel_fup_limpo = "".join([c for c in tel if c.isdigit()])
                             if tel_fup_limpo:
                                 if not tel_fup_limpo.startswith("55") and len(tel_fup_limpo) >= 10: 
                                     tel_fup_limpo = "55" + tel_fup_limpo
-                                link_fup = f"https://wa.me/{tel_fup_limpo}?text={urllib.parse.quote(fup_texto)}"
+                                link_fup = f"https://wa.me/{tel_fup_limpo}?text={urllib.parse.quote(fup_texto_limpo)}"
                                 st.link_button("🚀 Enviar Follow-up", link_fup)
                                 
                         else:
