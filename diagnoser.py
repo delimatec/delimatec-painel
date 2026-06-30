@@ -21,6 +21,10 @@ gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if "SUA_CHAVE" not in ANTHROPIC_API_KEY else None
 
 def obter_avaliacoes_ruins(place_id):
+    # CORREÇÃO: Se não tiver place_id (lead veio do site), não tenta buscar no Maps
+    if not place_id:
+        return []
+        
     try:
         detalhes = gmaps.place(place_id=place_id, fields=['reviews'], language='pt-BR')
         reviews = detalhes.get('result', {}).get('reviews', [])
@@ -37,24 +41,33 @@ def obter_avaliacoes_ruins(place_id):
 
 def analisar_com_claude(dados_empresa, avaliacoes):
     if not anthropic_client: return "Perfil precisa de posicionamento local e suporte digital."
-    contexto_reviews = "\n".join([f"- Nota {r['nota']}: {r['texto']}" for r in avaliacoes]) if avaliacoes else "Pouca tração orgânica na busca."
     
-    # NOVO: Inserimos o Status do Site no prompt!
-    prompt = f"Você é o consultor chefe da DeLimaTec (Especialistas em Suporte de TI e SEO Local). Analise este comércio e crie um diagnóstico direto (gargalo de infraestrutura digital e marketing) em até 100 palavras. Mostre que é um erro técnico solucionável. Empresa: {dados_empresa['nome']}. Nota: {dados_empresa['nota_atual']}. Status do Site de Vendas (T.I.): {dados_empresa.get('status_site', 'Desconhecido')}. Avaliações ruins do Maps: {contexto_reviews}"
+    contexto_reviews = "\n".join([f"- Nota {r['nota']}: {r['texto']}" for r in avaliacoes]) if avaliacoes else "Nenhuma avaliação extraída ou lead originado do site."
+    necessidade = dados_empresa.get('necessidade_cliente', '')
+    
+    prompt = f"Você é o consultor chefe da DeLimaTec (Especialistas em Suporte de TI e SEO Local). Analise este comércio e crie um diagnóstico direto (gargalo de infraestrutura digital e marketing) em até 100 palavras. Mostre que é um erro técnico solucionável. Empresa: {dados_empresa.get('nome')}. Nota: {dados_empresa.get('nota_atual')}. Status do Site de Vendas (T.I.): {dados_empresa.get('status_site', 'Desconhecido')}. Avaliações ruins do Maps: {contexto_reviews}. Se houver uma necessidade específica descrita aqui '{necessidade}', foque a resposta nisso."
 
-    message = anthropic_client.messages.create(
-        model="claude-haiku-4-5-20251001", max_tokens=400, temperature=0.3,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return message.content[0].text
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20241022", max_tokens=250, temperature=0.3,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return message.content[0].text
+    except Exception as e:
+        return f"Erro ao gerar diagnóstico: {e}"
 
 def rodar_diagnostico():
     docs = db.collection("leads").where("status_agencia", "==", "scouted").stream()
     for doc in docs:
         dados_lead = doc.to_dict()
-        print(f"🔍 Diagnosticando Infra e Maps (DeLimaTec): {dados_lead['nome']}...")
-        piores = obter_avaliacoes_ruins(dados_lead['id_google'])
+        print(f"🔍 Diagnosticando Infra e Maps (DeLimaTec): {dados_lead.get('nome', 'Empresa')}...")
+        
+        # CORREÇÃO: Usamos o método .get() para não quebrar caso a chave 'id_google' não exista
+        id_google = dados_lead.get('id_google')
+        piores = obter_avaliacoes_ruins(id_google)
+        
         diag = analisar_com_claude(dados_lead, piores)
+        
         doc.reference.update({
             "piores_avaliacoes": piores,
             "diagnostico_ia": diag,
