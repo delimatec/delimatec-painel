@@ -322,7 +322,7 @@ with aba_vendas:
                                             if resp_backup.status_code == 200:
                                                 img_base64_str = base64.b64encode(resp_backup.content).decode('utf-8')
                                                 sucesso_geracao = True
-                                        ifsucesso_geracao:
+                                        if sucesso_geracao:
                                             img_base64_otimizada = otimizar_imagem_base64(img_base64_str)
                                             doc.reference.update({"imagem_gerada_base64": img_base64_otimizada})
                                             st.rerun()
