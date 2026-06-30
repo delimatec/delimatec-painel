@@ -3,6 +3,7 @@ import googlemaps
 import requests
 import warnings
 import os
+import re
 from bs4 import BeautifulSoup
 
 try:
@@ -22,32 +23,40 @@ gmaps = googlemaps.Client(key=API_KEY)
 
 def verificar_e_ler_site(url):
     if not url or url == 'Não possui':
-        return "Não possui site", "Sem informações do site."
+        return "Não possui site", "Sem informações do site.", None
     
     try:
-        # Disfarça o robô como se fosse um navegador comum para os sites não bloquearem
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         resposta = requests.get(url, headers=headers, timeout=5, verify=False)
         
         status_seguranca = "Seguro (HTTPS Ativo)" if url.startswith("https") else "Inseguro (Sem HTTPS - Risco de Segurança)"
         
-        # Faz o Web Scraping Profundo
         soup = BeautifulSoup(resposta.text, 'html.parser')
         
-        # Remove os códigos por trás da tela (Javascript e CSS) para pegar só o texto legível
+        # 🟢 INTEGRAÇÃO INTELIGENTE: RASTREADOR DE WHATSAPP NO SITE
+        whatsapp_encontrado = None
+        for link in soup.find_all('a', href=True):
+            href = link['href'].lower()
+            if 'wa.me' in href or 'api.whatsapp.com' in href or 'whatsapp.com/send' in href:
+                # Extrai apenas os dígitos do número do link
+                numeros = re.sub(r'\D', '', href)
+                if len(numeros) >= 10:
+                    whatsapp_encontrado = numeros
+                    break
+                    
+        # Remove códigos estruturais de design
         for script in soup(["script", "style"]):
             script.extract()
             
         texto_puro = soup.get_text(separator=' ', strip=True)
-        # Pega os primeiros 1000 caracteres (o suficiente para a IA entender o negócio do cliente)
         resumo_site = texto_puro[:1000] if len(texto_puro) > 10 else "Site sem textos descritivos."
         
-        return status_seguranca, resumo_site
+        return status_seguranca, resumo_site, whatsapp_encontrado
 
     except requests.exceptions.SSLError:
-        return "Inseguro (Erro de Certificado SSL quebrado)", "Não foi possível extrair dados (Erro SSL)."
+        return "Inseguro (Erro de Certificado SSL quebrado)", "Não foi possível extrair dados (Erro SSL).", None
     except requests.exceptions.RequestException:
-        return "Site fora do ar ou link quebrado", "Não foi possível extrair dados."
+        return "Site fora do ar ou link quebrado", "Não foi possível extrair dados.", None
 
 def filtrar_e_salvar_negocio(place_details, nicho_pesquisado):
     nome = place_details.get('name')
@@ -61,24 +70,38 @@ def filtrar_e_salvar_negocio(place_details, nicho_pesquisado):
         print(f"⏭️ {nome} já existe. Pula para o próximo.")
         return
 
-    # Nova função em ação
-    status_do_site, conteudo_site = verificar_e_ler_site(website)
+    # Nova função em ação (agora retorna 3 valores)
+    status_do_site, conteudo_site, wpp_encontrado = verificar_e_ler_site(website)
+
+    # 🟢 Define o telefone final: Se achar WhatsApp no site, substitui o fixo do Google Maps!
+    telefone_final = place_details.get('formatted_phone_number', 'Não encontrado')
+    if wpp_encontrado:
+        # Se veio com o 55 da API, remove para formatar bonito na tela do painel
+        if wpp_encontrado.startswith("55") and len(wpp_encontrado) > 4:
+            wpp_encontrado = wpp_encontrado[2:]
+        
+        if len(wpp_encontrado) == 11: # Celular com 9 dígitos + DDD
+            telefone_final = f"({wpp_encontrado[:2]}) {wpp_encontrado[2:7]}-{wpp_encontrado[7:]}"
+        elif len(wpp_encontrado) == 10: # Celular antigo ou fixo com DDD
+            telefone_final = f"({wpp_encontrado[:2]}) {wpp_encontrado[2:6]}-{wpp_encontrado[6:]}"
+        else:
+            telefone_final = f"+55 {wpp_encontrado}"
 
     dados_lead = {
         "id_google": place_id,
         "nome": nome,
         "nicho": nicho_pesquisado,
-        "telefone": place_details.get('formatted_phone_number', 'Não encontrado'),
+        "telefone": telefone_final,
         "endereco": place_details.get('formatted_address', ''),
         "nota_atual": rating,
         "total_avaliacoes": user_ratings_total,
         "website": website,
         "status_site": status_do_site,
-        "conteudo_extraido_site": conteudo_site, # Salvando a leitura profunda!
+        "conteudo_extraido_site": conteudo_site,
         "status_agencia": "scouted"
     }
     doc_ref.set(dados_lead)
-    print(f"✅ [Firestore] Lead salvo: {nome} | T.I: {status_do_site}")
+    print(f"✅ [Firestore] Lead salvo: {nome} | T.I: {status_do_site} | Tel: {telefone_final}")
 
 def varrer_regiao(termo_busca, localizacao):
     print(f"🔎 Buscando '{termo_busca}' em '{localizacao}'...")
