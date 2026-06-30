@@ -130,7 +130,7 @@ def gerar_pdf_proposta(lead):
     pdf.set_font("Arial", 'B', 11)
     pdf.cell(0, 8, "Pacote 2: Suporte T.I. Básico - R$ 297,00 / mês", ln=True)
     pdf.set_font("Arial", '', 10)
-    pdf.multi_cell(0, 6, "- Suporte Remoto (até 3 computadores)\n- Manutenção preventiva básica\n- SLA de resposta de 6 hours")
+    pdf.multi_cell(0, 6, "- Suporte Remoto (até 3 computadores)\n- Manutenção preventiva básica\n- SLA de resposta de 6 horas")
     pdf.ln(5)
 
     pdf.set_font("Arial", 'B', 11)
@@ -250,13 +250,23 @@ with aba_vendas:
                 with st.container(border=True):
                     col_info, col_pitch = st.columns([1, 2])
                     with col_info:
-                        st.subheader(lead.get('nome', 'Sem Nome'))
+                        # GERA O LINK DO GOOGLE MAPS
+                        nome_lead = lead.get('nome', 'Sem Nome')
+                        id_google = lead.get('id_google', '')
+                        nome_url = urllib.parse.quote(nome_lead)
+                        if id_google:
+                            maps_link = f"https://www.google.com/maps/search/?api=1&query={nome_url}&query_place_id={id_google}"
+                        else:
+                            maps_link = f"https://www.google.com/maps/search/?api=1&query={nome_url}"
+                        
+                        # TÍTULO AGORA É CLICÁVEL
+                        st.markdown(f"### [📍 {nome_lead}]({maps_link})")
+                        
                         st.write(f"🔐 **T.I Site:** {lead.get('status_site', 'Não checado')}")
                         st.write(f"⭐️ **Nota:** {lead.get('nota_atual', '')} | 💬 **Reviews:** {lead.get('total_avaliacoes', '')}")
                         
-                        nome_formatado = urllib.parse.quote(lead.get('nome', ''))
                         endereco_formatado = urllib.parse.quote(lead.get('endereco', ''))
-                        link_ig = f"https://www.google.com/search?q=site:instagram.com+{nome_formatado}+{endereco_formatado}"
+                        link_ig = f"https://www.google.com/search?q=site:instagram.com+{nome_url}+{endereco_formatado}"
                         st.link_button("🟣 Espiar Instagram", link_ig)
                         
                         # Telefone Editável e Disparo Turbo
@@ -281,7 +291,6 @@ with aba_vendas:
                             doc.reference.update({"status_agencia": "sent"})
                             st.rerun()
                         
-                        # 🔴 NOVO BOTÃO: DISPENSAR COMÉRCIO GRANDE
                         if st.button("❌ Dispensar Comércio", key=f"dispensar_{doc.id}", type="secondary", use_container_width=True):
                             doc.reference.update({"status_agencia": "dismissed"})
                             st.rerun()
@@ -387,7 +396,16 @@ with aba_crm:
             
             with target_col:
                 with st.container(border=True):
-                    st.write(f"**{lead.get('nome')}**")
+                    # Título também clicável no Kanban
+                    nome_lead_crm = lead.get('nome', 'Sem Nome')
+                    id_google_crm = lead.get('id_google', '')
+                    if id_google_crm:
+                        maps_link_crm = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(nome_lead_crm)}&query_place_id={id_google_crm}"
+                    else:
+                        maps_link_crm = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(nome_lead_crm)}"
+                    
+                    st.markdown(f"**[📍 {nome_lead_crm}]({maps_link_crm})**")
+                    
                     tel = lead.get('telefone', '')
                     if tel: st.caption(f"📞 {tel}")
                     st.caption(f"🔐 Site: {lead.get('status_site', 'Não checado')}")
