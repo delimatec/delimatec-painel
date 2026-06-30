@@ -122,25 +122,25 @@ def gerar_pdf_proposta(lead):
     pdf.ln(5)
 
     pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 8, "Pacote 1: Presença Digital Ativa (Maps)", ln=True)
+    pdf.cell(0, 8, "Pacote 1: Presença Digital (Maps) - R$ 197,00 / mês", ln=True)
     pdf.set_font("Arial", '', 10)
-    pdf.multi_cell(0, 6, "- Otimização de Perfil Google Meu Negócio\n- Respostas inteligentes para avaliações\n- Suporte na atualização de dados")
+    pdf.multi_cell(0, 6, "- Otimização do Google Meu Negócio\n- Resposta a todas as avaliações (IA)\n- 2 Postagens mensais no perfil")
     pdf.ln(5)
 
     pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 8, "Pacote 2: Infraestrutura Segura (T.I.)", ln=True)
+    pdf.cell(0, 8, "Pacote 2: Suporte T.I. Básico - R$ 297,00 / mês", ln=True)
     pdf.set_font("Arial", '', 10)
-    pdf.multi_cell(0, 6, "- Suporte Técnico Remoto Especializado\n- Configuração de Redes e Wi-Fi Seguro para Clientes\n- Prevenção e diagnóstico de equipamentos")
+    pdf.multi_cell(0, 6, "- Suporte Remoto (até 3 computadores)\n- Manutenção preventiva básica\n- SLA de resposta de 6 horas")
     pdf.ln(5)
 
     pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 8, "Pacote 3: DeLimaTec Full Experience (Maps + T.I.)", ln=True)
+    pdf.cell(0, 8, "Pacote 3: Combo DeLimaTec - R$ 397,00 / mês (Melhor Opção)", ln=True)
     pdf.set_font("Arial", '', 10)
-    pdf.multi_cell(0, 6, "- Todos os benefícios do Pacote 1 e 2 unidos\n- Consultoria em Segurança do Site Institucional\n- Atendimento VIP Integrado")
+    pdf.multi_cell(0, 6, "- Todos os benefícios do Pacote 1 e 2 unidos\n- Prioridade no atendimento (SLA 3h)\n- Economia de R$ 97,00 todos os meses")
     pdf.ln(10)
     
     pdf.set_font("Arial", 'I', 10)
-    pdf.multi_cell(0, 6, "Para alinhar valores de investmento, responda esta mensagem no WhatsApp e agendaremos uma rápida reunião de alinhamento técnico.")
+    pdf.multi_cell(0, 6, "Para alinhar os valores de investimento, responda a esta mensagem no WhatsApp e agendaremos uma rápida reunião de alinhamento técnico.")
     return bytes(pdf.output())
 
 # =========================================================================
