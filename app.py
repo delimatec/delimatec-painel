@@ -155,7 +155,6 @@ aba_buscar, aba_vendas, aba_crm, aba_metricas = st.tabs(["🔎 Mineração", "�
 
 # ==================== ABA 1: MINERAÇÃO & INBOUND ====================
 with aba_buscar:
-    # 🔔 NOVO BLOCO: DETECTOR AUTOMÁTICO DE LEADS DO SITE
     try:
         leads_site_pendentes = list(db.collection("leads").where("nicho", "==", "Captado via Site").where("status_agencia", "==", "scouted").stream())
         if leads_site_pendentes:
@@ -190,7 +189,6 @@ with aba_buscar:
     except Exception:
         pass
 
-    # Fluxo normal de mineração do Google Maps
     st.subheader("Minerar Novas Regiões (Google Maps)")
     col1, col2 = st.columns(2)
     with col1: nicho = st.text_input("Nicho?", placeholder="Ex: Padaria")
@@ -261,12 +259,23 @@ with aba_vendas:
                         link_ig = f"https://www.google.com/search?q=site:instagram.com+{nome_formatado}+{endereco_formatado}"
                         st.link_button("🟣 Espiar Instagram", link_ig)
                         
-                        telefone = lead.get('telefone', '')
-                        st.write(f"📞 **Tel:** {telefone}")
-                        tel_limpo = "".join([c for c in telefone if c.isdigit()])
+                        # NOVO: Telefone Editável e Disparo Turbo
+                        telefone_db = lead.get('telefone', '')
+                        novo_telefone = st.text_input("📞 WhatsApp do Cliente:", value=telefone_db, key=f"tel_input_{doc.id}")
+                        
+                        # Salva o novo telefone no banco se a esposa editar
+                        if novo_telefone != telefone_db:
+                            doc.reference.update({"telefone": novo_telefone})
+                        
+                        tel_limpo = "".join([c for c in novo_telefone if c.isdigit()])
                         if tel_limpo:
                             if not tel_limpo.startswith("55") and len(tel_limpo) >= 10: tel_limpo = "55" + tel_limpo
-                            st.link_button("🟢 Abrir no WhatsApp", f"https://wa.me/{tel_limpo}")
+                            
+                            pitch_texto = lead.get('pitch_vendas_whatsapp', '')
+                            texto_codificado = urllib.parse.quote(pitch_texto)
+                            link_wpp = f"https://wa.me/{tel_limpo}?text={texto_codificado}"
+                            
+                            st.link_button("🚀 Disparo Turbo (WhatsApp)", link_wpp, type="primary")
                         
                         if st.button("✅ Marcar Enviado (Mover pro CRM)", key=f"status_{doc.id}"):
                             doc.reference.update({"status_agencia": "sent"})
@@ -279,7 +288,7 @@ with aba_vendas:
                             c1.download_button("📄 Baixar Auditoria", gerar_pdf_auditoria(lead, amostras), f"Auditoria_{lead.get('nome')}.pdf", "application/pdf", key=f"aud_{doc.id}")
                             c2.download_button("💼 Baixar Proposta Comercial", gerar_pdf_proposta(lead), f"Proposta_{lead.get('nome')}.pdf", "application/pdf", key=f"prop_{doc.id}")
                             
-                        st.text_area("Pitch WhatsApp:", lead.get('pitch_vendas_whatsapp', ''), height=150, key=f"pitch_{doc.id}")
+                        st.text_area("Pitch WhatsApp (Pode ser ajustado aqui ou no próprio app):", lead.get('pitch_vendas_whatsapp', ''), height=150, key=f"pitch_{doc.id}")
                         
                         if amostras:
                             with st.expander("📝 Ver Post e Respostas"):
@@ -382,6 +391,15 @@ with aba_crm:
                         fup_texto = lead.get("follow_up_texto")
                         if fup_texto:
                             st.text_area("Texto de Follow-up:", fup_texto, height=100, key=f"txt_{doc.id}")
+                            
+                            # NOVO: Disparo Turbo também no Follow-up do CRM!
+                            tel_fup_limpo = "".join([c for c in tel if c.isdigit()])
+                            if tel_fup_limpo:
+                                if not tel_fup_limpo.startswith("55") and len(tel_fup_limpo) >= 10: 
+                                    tel_fup_limpo = "55" + tel_fup_limpo
+                                link_fup = f"https://wa.me/{tel_fup_limpo}?text={urllib.parse.quote(fup_texto)}"
+                                st.link_button("🚀 Enviar Follow-up", link_fup)
+                                
                         else:
                             if st.button("🔁 Gerar Follow-up (IA)", key=f"fup_btn_{doc.id}"):
                                 with st.spinner("Pensando..."):
