@@ -21,7 +21,6 @@ gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if "SUA_CHAVE" not in ANTHROPIC_API_KEY else None
 
 def obter_avaliacoes_ruins(place_id):
-    # CORREÇÃO: Se não tiver place_id (lead veio do site), não tenta buscar no Maps
     if not place_id:
         return []
         
@@ -42,14 +41,29 @@ def obter_avaliacoes_ruins(place_id):
 def analisar_com_claude(dados_empresa, avaliacoes):
     if not anthropic_client: return "Perfil precisa de posicionamento local e suporte digital."
     
-    contexto_reviews = "\n".join([f"- Nota {r['nota']}: {r['texto']}" for r in avaliacoes]) if avaliacoes else "Nenhuma avaliação extraída ou lead originado do site."
+    contexto_reviews = "\n".join([f"- Nota {r['nota']}: {r['texto']}" for r in avaliacoes]) if avaliacoes else "Nenhuma avaliação extraída."
     necessidade = dados_empresa.get('necessidade_cliente', '')
     
-    prompt = f"Você é o consultor chefe da DeLimaTec (Especialistas em Suporte de TI e SEO Local). Analise este comércio e crie um diagnóstico direto (gargalo de infraestrutura digital e marketing) em até 100 palavras. Mostre que é um erro técnico solucionável. Empresa: {dados_empresa.get('nome')}. Nota: {dados_empresa.get('nota_atual')}. Status do Site de Vendas (T.I.): {dados_empresa.get('status_site', 'Desconhecido')}. Avaliações ruins do Maps: {contexto_reviews}. Se houver uma necessidade específica descrita aqui '{necessidade}', foque a resposta nisso."
+    # Puxa o texto lido pelo robô scout
+    conteudo_site = dados_empresa.get('conteudo_extraido_site', 'Não avaliado ou inexistente.')
+    
+    prompt = f"""
+    Você é o consultor chefe da DeLimaTec (Especialistas em Suporte de TI e SEO Local). 
+    Analise este comércio e crie um diagnóstico direto (gargalo de infraestrutura digital e marketing) em até 100 palavras. 
+    Mostre que é um erro técnico solucionável e cite algum serviço que eles prestam (se encontrado no texto do site) para gerar conexão.
+    
+    Dados do cliente:
+    - Empresa: {dados_empresa.get('nome')}
+    - Nota no Maps: {dados_empresa.get('nota_atual')}
+    - Status de Segurança do Site (T.I.): {dados_empresa.get('status_site', 'Desconhecido')}
+    - Texto extraído do site da empresa: '{conteudo_site}'
+    - Avaliações ruins do Maps: {contexto_reviews}
+    - Necessidade específica (se houver): '{necessidade}'
+    """
 
     try:
         message = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022", max_tokens=250, temperature=0.3,
+            model="claude-haiku-4-5-20251001", max_tokens=450, temperature=0.3,
             messages=[{"role": "user", "content": prompt}]
         )
         return message.content[0].text
@@ -62,7 +76,6 @@ def rodar_diagnostico():
         dados_lead = doc.to_dict()
         print(f"🔍 Diagnosticando Infra e Maps (DeLimaTec): {dados_lead.get('nome', 'Empresa')}...")
         
-        # CORREÇÃO: Usamos o método .get() para não quebrar caso a chave 'id_google' não exista
         id_google = dados_lead.get('id_google')
         piores = obter_avaliacoes_ruins(id_google)
         
