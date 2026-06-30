@@ -32,7 +32,7 @@ def criar_mensagem_vendas(dados_lead):
     REGRAS DE FORMATAÇÃO PARA O WHATSAPP (MUITO IMPORTANTE):
     1. NUNCA use duplo asterisco (**) para negrito. Use SEMPRE apenas um asterisco (*texto*).
     2. NÃO use linhas horizontais como (---).
-    3. Use no máximo 2 emojis na mensagem inteira para manter o tom profissional.
+    3. Use no máximo 3 emojis na mensagem inteira para manter o tom profissional.
     """
 
     message = anthropic_client.messages.create(
