@@ -23,29 +23,26 @@ except ImportError:
     from google.cloud import firestore
     db = firestore.Client.from_service_account_json("credenciais-google.json")
 
+# Inicializa a memória da página atual no sistema
+if "pagina_vendas" not in st.session_state:
+    st.session_state.pagina_vendas = 0
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
 # =========================================================================
-# CONFIGURAÇÃO DA PÁGINA E SISTEMA DE LOGIN (NOVIDADE)
+# CONFIGURAÇÃO DA PÁGINA E LOGIN
 # =========================================================================
 st.set_page_config(page_title="DeLimaTec OS", page_icon="💻", layout="wide")
 
-# Inicializa as variáveis de sessão
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
-if "pagina_vendas" not in st.session_state:
-    st.session_state.pagina_vendas = 0
-
 def verificar_login():
-    # Puxa os dados do cofre (ou usa um padrão caso rode na máquina local)
     usu_correto = st.secrets.get("LOGIN_USUARIO", "admin")
     senha_correta = st.secrets.get("LOGIN_SENHA", "admin")
-    
     if st.session_state.usu_input == usu_correto and st.session_state.senha_input == senha_correta:
         st.session_state.autenticado = True
-        st.session_state.senha_input = "" # Limpa a senha por segurança
+        st.session_state.senha_input = ""
     else:
         st.error("❌ Usuário ou senha incorretos.")
 
-# Bloqueio de Tela
 if not st.session_state.autenticado:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -55,7 +52,7 @@ if not st.session_state.autenticado:
             st.text_input("Usuário", key="usu_input")
             st.text_input("Senha", type="password", key="senha_input")
             st.button("Entrar no Sistema", on_click=verificar_login, type="primary", use_container_width=True)
-    st.stop() # Esta função MATA o carregamento da página se não estiver logado. Ninguém passa daqui!
+    st.stop()
 
 # =========================================================================
 # FUNÇÕES DE APOIO E PDF
@@ -74,7 +71,7 @@ def otimizar_imagem_base64(b64_string):
 
 def limpar_texto_pdf(texto):
     if not isinstance(texto, str): return ""
-    substituicoes = {"—": "-", "–": "-", "“": '"', "”": '"', "‘": "'", "’": "'", "…": "...", "⭐": "*", "✨": "*", "🚀": ">", "🎁": ">"}
+    substituicoes = {"—": "-", "–": "-", "“": '"', "’": '"', "‘": "'", "’": "'", "…": "...", "⭐": "*", "✨": "*", "🚀": ">", "🎁": ">"}
     for velho, retro in substituicoes.items(): texto = texto.replace(velho, retro)
     return texto.encode('latin-1', 'replace').decode('latin-1')
 
@@ -143,12 +140,11 @@ def gerar_pdf_proposta(lead):
     pdf.ln(10)
     
     pdf.set_font("Arial", 'I', 10)
-    pdf.multi_cell(0, 6, "Para alinhar valores de investimento, responda esta mensagem no WhatsApp e agendaremos uma rápida reunião de alinhamento técnico.")
+    pdf.multi_cell(0, 6, "Para alinhar valores de investmento, responda esta mensagem no WhatsApp e agendaremos uma rápida reunião de alinhamento técnico.")
     return bytes(pdf.output())
 
-
 # =========================================================================
-# PAINEL PRINCIPAL (SÓ APARECE DEPOIS DE LOGAR)
+# PAINEL PRINCIPAL
 # =========================================================================
 st.title("💻 DeLimaTec OS - Máquina de Vendas e CRM")
 if st.button("Sair (Logout)", type="secondary"):
@@ -157,8 +153,45 @@ if st.button("Sair (Logout)", type="secondary"):
 
 aba_buscar, aba_vendas, aba_crm, aba_metricas = st.tabs(["🔎 Mineração", "💰 Fila de Vendas", "💼 Pipeline CRM", "📊 Métricas"])
 
-# ==================== ABA 1 ====================
+# ==================== ABA 1: MINERAÇÃO & INBOUND ====================
 with aba_buscar:
+    # 🔔 NOVO BLOCO: DETECTOR AUTOMÁTICO DE LEADS DO SITE
+    try:
+        leads_site_pendentes = list(db.collection("leads").where("nicho", "==", "Captado via Site").where("status_agencia", "==", "scouted").stream())
+        if leads_site_pendentes:
+            st.warning(f"🔔 **Novos Cadastros no Site:** Existem **{len(leads_site_pendentes)}** empresas aguardando a Auditoria Gratuita solicitada no site!")
+            if st.button("🤖 Processar Leads do Site Agora", type="secondary", use_container_width=True):
+                st.markdown("### 💻 Processando Leads Inbound")
+                terminal_site = st.empty()
+                
+                class RedirecionadorSite:
+                    def __init__(self, container):
+                        self.container = container
+                        self.texto = ""
+                    def write(self, msg):
+                        self.texto += msg
+                        self.container.code(self.texto, language="bash")
+                    def flush(self): pass
+
+                antigo_stdout = sys.stdout
+                sys.stdout = RedirecionadorSite(terminal_site)
+                try:
+                    with st.spinner("Executando Inteligência Artificial..."):
+                        rodar_diagnostico()
+                        rodar_builder()
+                        rodar_pitcher()
+                        st.success("✅ Sucesso! Os clientes do site já estão com os PDFs prontos na 'Fila de Vendas'!")
+                        st.rerun()
+                except Exception as ex:
+                    st.error(f"Erro: {ex}")
+                finally:
+                    sys.stdout = antigo_stdout
+            st.markdown("---")
+    except Exception:
+        pass
+
+    # Fluxo normal de mineração do Google Maps
+    st.subheader("Minerar Novas Regiões (Google Maps)")
     col1, col2 = st.columns(2)
     with col1: nicho = st.text_input("Nicho?", placeholder="Ex: Padaria")
     with col2: localizacao = st.text_input("Local?", placeholder="Ex: Vila Izabel, Guarulhos SP")
@@ -289,7 +322,7 @@ with aba_vendas:
                                             if resp_backup.status_code == 200:
                                                 img_base64_str = base64.b64encode(resp_backup.content).decode('utf-8')
                                                 sucesso_geracao = True
-                                        if sucesso_geracao:
+                                        ifsucesso_geracao:
                                             img_base64_otimizada = otimizar_imagem_base64(img_base64_str)
                                             doc.reference.update({"imagem_gerada_base64": img_base64_otimizada})
                                             st.rerun()
